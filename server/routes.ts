@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { loginSchema, insertUserSchema, insertHolidaySchema } from "@shared/schema";
 import { readUsersFromSheet, getSheetTabs } from "./googleSheets";
 import { sheetAppendAttendance, sheetUpdateAttendance, sheetInitHeaders, sheetClearAttendance, testWebhook, APPS_SCRIPT_CODE } from "./appsScript";
-import { uploadExcusePhoto } from "./googleDrive";
+import { uploadExcusePhoto, getAuthUrl, auth } from "./googleDrive";
 import { sendCheckInNotification, sendLateNotification, sendCheckOutNotification, sendManualAttendanceNotification, sendExcuseNotificationToHomeroom, sendAlphaNotification, sendTestNotification } from "./fonnte";
 import crypto from "crypto";
 import fs from "fs";
@@ -278,6 +278,54 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Change password error:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // GOOGLE DRIVE OAUTH ROUTES
+  app.get("/api/google-drive/auth-url", requireRole("admin"), async (_req: Request, res: Response) => {
+    try {
+      const authUrl = getAuthUrl();
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Error generating auth URL:', error);
+      res.status(500).json({ message: "Failed to generate auth URL" });
+    }
+  });
+
+  app.post("/api/google-drive/callback", requireRole("admin"), async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: "Authorization code is required" });
+      }
+
+      const { tokens } = await auth.getToken(code);
+      auth.setCredentials(tokens);
+
+      // Save credentials
+      const credentialsPath = path.join(process.cwd(), 'google-credentials.json');
+      fs.writeFileSync(credentialsPath, JSON.stringify({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expiry_date: tokens.expiry_date,
+      }, null, 2));
+
+      console.log('Google Drive authentication successful');
+      res.json({ message: "Google Drive connected successfully" });
+    } catch (error) {
+      console.error('Error handling Google Drive callback:', error);
+      res.status(500).json({ message: "Failed to connect Google Drive" });
+    }
+  });
+
+  app.get("/api/google-drive/status", requireRole("admin"), async (_req: Request, res: Response) => {
+    try {
+      const credentialsPath = path.join(process.cwd(), 'google-credentials.json');
+      const exists = fs.existsSync(credentialsPath);
+      res.json({ connected: exists });
+    } catch (error) {
+      console.error('Error checking Google Drive status:', error);
+      res.status(500).json({ message: "Failed to check status" });
     }
   });
 
@@ -1377,7 +1425,7 @@ export async function registerRoutes(
       if (req.file) {
         const user = await storage.getUser(req.session.userId!);
         const fileName = `izin_${user?.name}_${date}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
-        const result = await uploadExcusePhoto(req.file.buffer, fileName, req.file.mimetype);
+        const result = await uploadExcusePhoto(req.file.buffer, fileName, req.file.mimetype, req.session.userId!, type, date);
         if (result) {
           driveFileId = result.fileId;
           photoUrl = result.webViewLink;

@@ -581,6 +581,10 @@ function SettingsTab() {
   const { data: status } = useQuery<any>({ queryKey: ["/api/scanner/status"] });
   const { data: fullSettings } = useQuery<any>({ queryKey: ["/api/scanner/full-settings"] });
   const { data: holidays } = useQuery<any[]>({ queryKey: ["/api/holidays"] });
+  const { data: googleDriveStatus } = useQuery<{ connected: boolean }>({ 
+    queryKey: ["/api/google-drive/status"],
+    refetchInterval: 30000 // Check every 30 seconds
+  });
 
   const [settingsTab, setSettingsTab] = useState("scanner");
 
@@ -600,6 +604,8 @@ function SettingsTab() {
   const [fonnteTestLoading, setFonnteTestLoading] = useState(false);
   const [googleSheetId, setGoogleSheetId] = useState("");
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState("");
+  const [googleDriveConnected, setGoogleDriveConnected] = useState(false);
+  const [googleDriveLoading, setGoogleDriveLoading] = useState(false);
   const [csvUrlSiswa, setCsvUrlSiswa] = useState("");
   const [csvUrlGuru, setCsvUrlGuru] = useState("");
   const [csvUrlWaliKelas, setCsvUrlWaliKelas] = useState("");
@@ -655,6 +661,69 @@ function SettingsTab() {
       setAlphaNotifTime(fullSettings.alphaNotifTime || "09:00");
     }
   }, [fullSettings]);
+
+  // Update Google Drive connection status
+  useEffect(() => {
+    if (googleDriveStatus) {
+      setGoogleDriveConnected(googleDriveStatus.connected);
+    }
+  }, [googleDriveStatus]);
+
+  // Handle Google Drive OAuth
+  const handleConnectGoogleDrive = async () => {
+    setGoogleDriveLoading(true);
+    try {
+      const res = await fetch("/api/google-drive/auth-url", { credentials: "include" });
+      const data = await res.json();
+      if (data.authUrl) {
+        window.open(data.authUrl, "_blank", "width=500,height=600");
+        toast({ title: "Buka jendela popup untuk login Google" });
+      }
+    } catch (error) {
+      toast({ title: "Gagal mendapatkan auth URL", variant: "destructive" });
+    } finally {
+      setGoogleDriveLoading(false);
+    }
+  };
+
+  // Handle OAuth callback (for popup communication)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'google-drive-oauth-callback') {
+        const { code } = event.data;
+        if (code) {
+          handleOAuthCallback(code);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleOAuthCallback = async (code: string) => {
+    setGoogleDriveLoading(true);
+    try {
+      const res = await fetch("/api/google-drive/callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+        credentials: "include"
+      });
+      
+      if (res.ok) {
+        toast({ title: "Google Drive berhasil terhubung!" });
+        queryClient.invalidateQueries({ queryKey: ["/api/google-drive/status"] });
+      } else {
+        const error = await res.text();
+        toast({ title: "Gagal menghubungkan Google Drive", description: error, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Gagal menghubungkan Google Drive", variant: "destructive" });
+    } finally {
+      setGoogleDriveLoading(false);
+    }
+  };
 
   const getDay = (day: string): DayScheduleType => weeklySchedule[day] || { ...defaultSchedule };
   const setDay = (day: string, field: string, value: any) => {
@@ -1128,6 +1197,63 @@ function SettingsTab() {
                   ID folder dari URL: drive.google.com/drive/folders/<span className="font-mono text-primary">ID_DISINI</span>
                 </p>
               </div>
+              
+              {/* Google Drive OAuth2 Authentication */}
+              <div className="pt-3 border-t">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <Label className="text-base font-medium">Google Drive Authentication</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Hubungkan Google Drive untuk upload gambar izin siswa secara otomatis
+                    </p>
+                  </div>
+                  <Badge variant={googleDriveConnected ? "default" : "outline"} className="text-xs">
+                    {googleDriveConnected ? "Terhubung" : "Belum terhubung"}
+                  </Badge>
+                </div>
+                
+                {!googleDriveConnected ? (
+                  <div className="space-y-3">
+                    <Button 
+                      onClick={handleConnectGoogleDrive} 
+                      disabled={googleDriveLoading}
+                      className="w-full"
+                      data-testid="button-connect-google-drive"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {googleDriveLoading ? "Menghubungkan..." : "Hubungkan Google Drive"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Klik tombol di atas untuk login dengan Google dan berikan akses ke Google Drive
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                          Google Drive terhubung
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-300">
+                          Upload gambar izin siswa akan otomatis tersimpan di Google Drive
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={handleConnectGoogleDrive} 
+                      disabled={googleDriveLoading}
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-reconnect-google-drive"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      {googleDriveLoading ? "Menghubungkan ulang..." : "Hubungkan ulang"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
               <div className="pt-3 border-t">
                 <div className="flex items-center justify-between mb-1">
                   <Label>URL Webhook Google Apps Script</Label>

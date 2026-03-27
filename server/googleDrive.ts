@@ -1,15 +1,80 @@
 // Google Drive Integration for Upload Gambar Izin Siswa
 import { google } from 'googleapis';
 import { db } from './db';
+import fs from 'fs';
+import path from 'path';
 
 // OAuth2 Configuration
 const auth = new google.auth.OAuth2Client({
-  clientId: process.env.GOOGLE_DRIVE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
-  redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback',
+  clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || '',
+  clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
+  redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback',
 });
 
-const drive = google.drive({ version: 'v3', auth });
+// Store refresh token for persistent access
+let refreshAccessToken: string | null = null;
+
+// Initialize with stored credentials
+async function initializeAuth() {
+  try {
+    // Check if we have stored credentials
+    const credentialsPath = path.join(process.cwd(), 'google-credentials.json');
+    
+    if (fs.existsSync(credentialsPath)) {
+      const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+      auth.setCredentials({
+        refresh_token: credentials.refresh_token,
+        access_token: credentials.access_token,
+      });
+      refreshAccessToken = credentials.refresh_token;
+      console.log('Google Drive credentials loaded from file');
+      return true;
+    }
+  } catch (error) {
+    console.error('Error loading Google Drive credentials:', error);
+  }
+  return false;
+}
+
+// Save credentials to file
+async function saveCredentials(tokens: any) {
+  try {
+    const credentialsPath = path.join(process.cwd(), 'google-credentials.json');
+    fs.writeFileSync(credentialsPath, JSON.stringify({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expiry_date: tokens.expiry_date,
+    }, null, 2));
+    console.log('Google Drive credentials saved to file');
+  } catch (error) {
+    console.error('Error saving Google Drive credentials:', error);
+  }
+}
+
+// Get authenticated drive client
+async function getDriveClient() {
+  // Initialize if not already done
+  await initializeAuth();
+  
+  // Check if token is expired and refresh if needed
+  const credentials = auth.getCredentials();
+  if (!credentials.access_token || (credentials.expiry_date && Date.now() > credentials.expiry_date)) {
+    if (refreshAccessToken) {
+      try {
+        const { credentials: newTokens } = await auth.refreshAccessToken();
+        await saveCredentials(newTokens);
+        console.log('Google Drive access token refreshed');
+      } catch (error) {
+        console.error('Error refreshing Google Drive token:', error);
+        throw new Error('Google Drive authentication failed. Please re-authenticate.');
+      }
+    } else {
+      throw new Error('No refresh token available. Please authenticate first.');
+    }
+  }
+  
+  return google.drive({ version: 'v3', auth });
+}
 
 // Constants
 const FOLDER_NAME = 'Absensi App';
@@ -18,13 +83,15 @@ const EXCUSE_FOLDER = 'Izin Siswa';
 // Get or create main folder
 async function getOrCreateMainFolder(): Promise<string> {
   try {
+    const drive = await getDriveClient();
+    
     // Search for existing folder
     const response = await drive.files.list({
       q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: 'files(id, name)',
     });
 
-    if (response.data.files?.length > 0) {
+    if (response.data.files && response.data.files.length > 0) {
       return response.data.files[0].id!;
     }
 
@@ -46,6 +113,7 @@ async function getOrCreateMainFolder(): Promise<string> {
 // Get or create student excuse folder
 async function getOrCreateStudentFolder(studentId: number): Promise<string> {
   try {
+    const drive = await getDriveClient();
     const mainFolderId = await getOrCreateMainFolder();
     const studentFolderName = `Siswa_${studentId}`;
 
@@ -55,7 +123,7 @@ async function getOrCreateStudentFolder(studentId: number): Promise<string> {
       fields: 'files(id, name)',
     });
 
-    if (response.data.files?.length > 0) {
+    if (response.data.files && response.data.files.length > 0) {
       return response.data.files[0].id!;
     }
 
@@ -85,6 +153,8 @@ export async function uploadExcusePhoto(
   date: string
 ): Promise<{ fileId: string; webViewLink: string } | null> {
   try {
+    const drive = await getDriveClient();
+    
     // Get student folder
     const studentFolderId = await getOrCreateStudentFolder(studentId);
     
@@ -141,6 +211,7 @@ export async function getStudentPhotos(studentId: number): Promise<Array<{
   reason: string;
 }>> {
   try {
+    const drive = await getDriveClient();
     const studentFolderId = await getOrCreateStudentFolder(studentId);
     
     const response = await drive.files.list({
@@ -149,7 +220,7 @@ export async function getStudentPhotos(studentId: number): Promise<Array<{
       orderBy: 'createdTime desc',
     });
 
-    return response.data.files?.map(file => ({
+    return response.data.files?.map((file: any) => ({
       id: file.id!,
       webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
       fileName: file.name!,
@@ -165,6 +236,7 @@ export async function getStudentPhotos(studentId: number): Promise<Array<{
 // Delete photo from Google Drive
 export async function deletePhoto(fileId: string): Promise<boolean> {
   try {
+    const drive = await getDriveClient();
     await drive.files.delete({
       fileId,
     });
@@ -186,3 +258,6 @@ export function getAuthUrl(): string {
     prompt: 'consent',
   });
 }
+
+// Export auth for use in routes
+export { auth };
