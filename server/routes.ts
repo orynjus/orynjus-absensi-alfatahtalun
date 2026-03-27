@@ -1454,10 +1454,20 @@ export async function registerRoutes(
       if (req.file) {
         const user = await storage.getUser(req.session.userId!);
         const fileName = `izin_${user?.name}_${date}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
+        console.log('Uploading photo:', {
+          fileName,
+          userId: req.session.userId,
+          type,
+          date,
+          fileSize: req.file.buffer.length
+        });
         const result = await uploadExcusePhoto(req.file.buffer, fileName, req.file.mimetype, req.session.userId!, type, date);
+        console.log('Upload result:', result);
         if (result) {
           driveFileId = result.fileId;
           photoUrl = result.webViewLink;
+        } else {
+          console.error('Upload failed - no result returned');
         }
       } else {
         // Jika tidak ada foto diunggah, gunakan gambar default dari Google Drive
