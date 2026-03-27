@@ -185,7 +185,7 @@ export async function uploadExcusePhoto(
       },
       media: {
         mimeType,
-        body: fileBuffer,
+        body: fileBuffer, // This is the correct way to pass buffer
       },
     });
     console.log('Upload response:', response.data);
