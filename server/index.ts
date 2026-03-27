@@ -101,7 +101,18 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || "3000", 10);
   const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
   
+  // Add health check before server starts
+  if (process.env.NODE_ENV === "production") {
+    log("Starting server with health check ready...");
+  }
+  
   httpServer.listen(port, host, () => {
     log(`serving on port ${port} (${host})`);
+    
+    // Log health check ready
+    if (process.env.NODE_ENV === "production") {
+      log("Health check endpoint: /api/health");
+      log("Server ready for Railway health check");
+    }
   });
 })();

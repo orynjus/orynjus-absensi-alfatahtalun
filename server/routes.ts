@@ -204,10 +204,7 @@ export async function registerRoutes(
     })
   );
 
-  await seedData();
-  sheetInitHeaders().catch(console.error);
-
-  // HEALTH CHECK ENDPOINT for Railway - Minimal and Fast
+  // HEALTH CHECK ENDPOINT for Railway - MUST BE FIRST (before any async operations)
   app.get("/api/health", (req, res) => {
     res.status(200).json({ 
       status: "ok", 
@@ -215,6 +212,9 @@ export async function registerRoutes(
       service: "absensi-app"
     });
   });
+
+  await seedData();
+  sheetInitHeaders().catch(console.error);
 
   // DETAILED HEALTH CHECK (optional)
   app.get("/api/health/detailed", (req: Request, res: Response) => {
