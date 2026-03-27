@@ -1,0 +1,11 @@
+node_modules
+dist
+uploads
+.git
+*.md
+*.log
+.env
+.env.*
+attached_assets
+project-source-code.zip
+scripts/generate-icons.cjs

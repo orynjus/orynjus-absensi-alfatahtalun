@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://neondb_owner:npg_x9bFvPBOco3I@ep-little-firefly-a10aet33-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - PORT=3000
+      - SESSION_SECRET=your_super_secret_session_key_here
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      - db
+    networks:
+      - absensi-network
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=absensi_db
+      - POSTGRES_USER=absensi_user
+      - POSTGRES_PASSWORD=your_strong_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - absensi-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - absensi-network
+
+volumes:
+  postgres_data:
+
+networks:
+  absensi-network:
+    driver: bridge

@@ -1,0 +1,38 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Nv-W2HSYY-WjrTmF6HXQA"
+uri = "file://PANDUAN-DEPLOY.md"
+type = "text"
+title = "Panduan Deploy — Sistem Absensi Digital"
+
+[[outputs]]
+id = "92eFbkpxuTprtSLXgCjow"
+uri = "file://PANDUAN-DEPLOY-FLY.md"
+type = "text"
+title = "Panduan Deploy ke Fly.io"
+
+[[outputs]]
+id = "jIhGINNKpMOHT6jurJZzk"
+uri = "file://PANDUAN-DEPLOY-RENDER.md"
+type = "text"
+title = "Panduan Deploy ke Render.com"
+
+[[outputs]]
+id = "wYgUuO2NlFF9HziicurBa"
+uri = "file://PANDUAN-DEPLOY-KOYEB.md"
+type = "text"
+title = "Panduan Deploy ke Koyeb (Gratis, Tanpa Kartu Kredit)"
+
+[[outputs]]
+id = "Z8TsHaWtNL_piic17TC7D"
+uri = "file://PANDUAN-INSTALL-LOKAL.md"
+type = "text"
+title = "Panduan Jalankan di Komputer Sekolah (Gratis Total)"
+
+[[outputs]]
+id = "BpWpvSDsgUtnn_KBUa7CR"
+uri = "file://PANDUAN-DEPLOY-HUGGINGFACE.md"
+type = "text"
+title = "Panduan Deploy ke Hugging Face Spaces (Gratis, Tanpa CC)"
