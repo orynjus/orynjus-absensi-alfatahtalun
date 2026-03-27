@@ -1,16 +1,13 @@
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm run build",
-    "watchPatterns": ["**/*.ts", "**/*.tsx", "**/*.json", "package*.json"]
+    "buildCommand": "npm run build"
   },
   "deploy": {
     "startCommand": "npm start",
     "restartPolicyType": "ON_FAILURE",
     "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 300,
-    "readinessPath": "/api/health",
-    "numReplicas": 1,
-    "maxRetries": 3
+    "healthcheckTimeout": 1000,
+    "numReplicas": 1
   }
 }

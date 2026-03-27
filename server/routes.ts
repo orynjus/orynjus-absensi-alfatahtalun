@@ -207,8 +207,17 @@ export async function registerRoutes(
   await seedData();
   sheetInitHeaders().catch(console.error);
 
-  // HEALTH CHECK ENDPOINT for Railway
-  app.get("/api/health", (req: Request, res: Response) => {
+  // HEALTH CHECK ENDPOINT for Railway - Minimal and Fast
+  app.get("/api/health", (req, res) => {
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      service: "absensi-app"
+    });
+  });
+
+  // DETAILED HEALTH CHECK (optional)
+  app.get("/api/health/detailed", (req: Request, res: Response) => {
     try {
       res.json({ 
         status: "ok", 
@@ -216,16 +225,18 @@ export async function registerRoutes(
         environment: process.env.NODE_ENV,
         port: process.env.PORT,
         uptime: process.uptime(),
-        memory: process.memoryUsage()
+        memory: process.memoryUsage(),
+        service: "absensi-app"
       });
     } catch (error) {
-      console.error('Health check failed:', error);
+      console.error('Detailed health check failed:', error);
       res.status(503).json({ 
         status: "error", 
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV,
         port: process.env.PORT,
-        error: "Health check failed"
+        error: "Health check failed",
+        service: "absensi-app"
       });
     }
   });
