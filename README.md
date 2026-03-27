@@ -14,6 +14,7 @@ npm run dev
 Lihat panduan deployment di:
 - [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 - [FREE_HOSTING_GUIDE.md](./FREE_HOSTING_GUIDE.md)
+- [RAILWAY_DEPLOY.md](./RAILWAY_DEPLOY.md)
 
 ## 📋 Fitur
 - QR Code absensi
@@ -29,3 +30,18 @@ Lihat panduan deployment di:
 - React + Vite
 - TailwindCSS
 - Drizzle ORM
+
+## 🚀 Deployment
+
+### Railway (Recommended)
+```bash
+# Repository: https://github.com/orynjus/orynjus-absensi-alfatahtalun
+# Branch: main
+# Build: npm run build
+# Start: npm start
+```
+
+## 📞 Quick Links
+- **GitHub:** https://github.com/orynjus/orynjus-absensi-alfatahtalun
+- **Railway:** Deploy dari branch `main`
+- **Documentation:** Lihat file `.md` di repository
