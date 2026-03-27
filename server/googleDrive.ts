@@ -163,16 +163,21 @@ export async function uploadExcusePhoto(
   date: string
 ): Promise<{ fileId: string; webViewLink: string } | null> {
   try {
+    console.log('Starting upload process for student:', studentId);
     const drive = await getDriveClient();
+    console.log('Drive client obtained');
     
     // Get student folder
     const studentFolderId = await getOrCreateStudentFolder(studentId);
+    console.log('Student folder ID:', studentFolderId);
     
     // Create unique filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const uniqueFileName = `${reason}_${timestamp}_${fileName}`;
+    console.log('Unique filename:', uniqueFileName);
 
     // Upload file
+    console.log('Starting file upload...');
     const response = await drive.files.create({
       requestBody: {
         name: uniqueFileName,
@@ -183,6 +188,7 @@ export async function uploadExcusePhoto(
         body: fileBuffer,
       },
     });
+    console.log('Upload response:', response.data);
 
     if (!response.data.id) {
       console.error('Upload failed: No file ID returned');
@@ -190,6 +196,7 @@ export async function uploadExcusePhoto(
     }
 
     // Make file publicly viewable
+    console.log('Setting permissions...');
     await drive.permissions.create({
       fileId: response.data.id,
       requestBody: {
@@ -201,13 +208,22 @@ export async function uploadExcusePhoto(
     const webViewLink = response.data.webViewLink || `https://drive.google.com/file/d/${response.data.id}/view`;
     
     console.log(`Photo uploaded for student ${studentId}:`, uniqueFileName);
+    console.log('File ID:', response.data.id);
+    console.log('Web View Link:', webViewLink);
     
     return {
       fileId: response.data.id,
       webViewLink,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to upload to Google Drive:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      studentId,
+      fileName,
+      fileSize: fileBuffer.length
+    });
     return null;
   }
 }
