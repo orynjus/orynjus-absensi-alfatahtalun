@@ -1,0 +1,34 @@
+name: absensi-alfatah
+services:
+  - name: web
+    type: web
+    runtime: docker
+    docker:
+      file: Dockerfile.koyeb
+      context: .
+    port: 5000
+    env:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        value: ${KOYEB_DATABASE_URL}
+      - key: SESSION_SECRET
+        generate: true
+      - key: FONNTE_TOKEN
+        value: ${FONNTE_TOKEN}
+    health_check:
+      path: /
+      port: 5000
+      grace_period: 30
+    instance_type: nano
+    regions:
+      - was
+      - fra
+      - sin
+    min_instances: 1
+    max_instances: 1
+    routes:
+      - path: /
+        port: 5000
