@@ -5,11 +5,11 @@ import fs from 'fs';
 import path from 'path';
 
 // OAuth2 Configuration
-const auth = new google.auth.OAuth2Client({
-  clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || '',
-  clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
-  redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback',
-});
+const auth = new google.auth.OAuth2(
+  process.env.GOOGLE_DRIVE_CLIENT_ID || '',
+  process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
+  process.env.GOOGLE_DRIVE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback'
+);
 
 // Store refresh token for persistent access
 let refreshAccessToken: string | null = null;
@@ -57,12 +57,22 @@ async function getDriveClient() {
   await initializeAuth();
   
   // Check if token is expired and refresh if needed
-  const credentials = auth.getCredentials();
-  if (!credentials.access_token || (credentials.expiry_date && Date.now() > credentials.expiry_date)) {
+  if (!auth.credentials.access_token || (auth.credentials.expiry_date && Date.now() > auth.credentials.expiry_date)) {
     if (refreshAccessToken) {
       try {
-        const { credentials: newTokens } = await auth.refreshAccessToken();
-        await saveCredentials(newTokens);
+        // Create new auth client with refresh token
+        const newAuth = new google.auth.OAuth2(
+          process.env.GOOGLE_DRIVE_CLIENT_ID || '',
+          process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
+          process.env.GOOGLE_DRIVE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback'
+        );
+        newAuth.setCredentials({
+          refresh_token: refreshAccessToken
+        });
+        
+        const { credentials } = await newAuth.refreshAccessToken();
+        auth.setCredentials(credentials);
+        await saveCredentials(credentials);
         console.log('Google Drive access token refreshed');
       } catch (error) {
         console.error('Error refreshing Google Drive token:', error);
