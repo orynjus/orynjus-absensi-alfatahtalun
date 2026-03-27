@@ -209,12 +209,25 @@ export async function registerRoutes(
 
   // HEALTH CHECK ENDPOINT for Railway
   app.get("/api/health", (req: Request, res: Response) => {
-    res.json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      port: process.env.PORT
-    });
+    try {
+      res.json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        port: process.env.PORT,
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
+      });
+    } catch (error) {
+      console.error('Health check failed:', error);
+      res.status(503).json({ 
+        status: "error", 
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        port: process.env.PORT,
+        error: "Health check failed"
+      });
+    }
   });
 
   // AUTH ROUTES
