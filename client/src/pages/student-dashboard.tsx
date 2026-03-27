@@ -237,7 +237,7 @@ export default function StudentDashboard() {
                   <div className="space-y-2">
                     {excuses?.map((e: any) => (
                       <div key={e.id} className="border rounded-lg p-3" data-testid={`card-excuse-${e.id}`}>
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-start mb-2">
                           <div>
                             <p className="font-medium">{e.date} - {e.type === "sakit" ? "Sakit" : "Izin"}</p>
                             <p className="text-sm text-muted-foreground">{e.description}</p>
@@ -246,6 +246,16 @@ export default function StudentDashboard() {
                             {e.status === "approved" ? "Disetujui" : e.status === "rejected" ? "Ditolak" : "Menunggu"}
                           </Badge>
                         </div>
+                        {e.photoUrl && (
+                          <div className="mt-2">
+                            <img 
+                              src={e.photoUrl} 
+                              alt="Bukti Izin" 
+                              className="rounded-lg max-w-full h-auto max-h-48 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => window.open(e.photoUrl, '_blank')}
+                            />
+                          </div>
+                        )}
                       </div>
                     ))}
                     {(!excuses || excuses.length === 0) && (

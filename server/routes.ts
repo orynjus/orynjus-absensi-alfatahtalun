@@ -204,45 +204,8 @@ export async function registerRoutes(
     })
   );
 
-  // RAILWAY HEALTH CHECK - Ultra Minimal (MUST BE FIRST)
-  app.get("/api/health", (req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end('{"status":"ok","service":"absensi-app"}');
-  });
-
-  // SIMPLE TEST ENDPOINT
-  app.get("/", (req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end('<h1>Absensi App - Running</h1><p><a href="/api/health">Health Check</a></p>');
-  });
-
   await seedData();
   sheetInitHeaders().catch(console.error);
-
-  // DETAILED HEALTH CHECK (optional)
-  app.get("/api/health/detailed", (req: Request, res: Response) => {
-    try {
-      res.json({ 
-        status: "ok", 
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV,
-        port: process.env.PORT,
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        service: "absensi-app"
-      });
-    } catch (error) {
-      console.error('Detailed health check failed:', error);
-      res.status(503).json({ 
-        status: "error", 
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV,
-        port: process.env.PORT,
-        error: "Health check failed",
-        service: "absensi-app"
-      });
-    }
-  });
 
   // AUTH ROUTES
   app.post("/api/auth/login", async (req: Request, res: Response) => {
@@ -1419,6 +1382,10 @@ export async function registerRoutes(
           driveFileId = result.fileId;
           photoUrl = result.webViewLink;
         }
+      } else {
+        // Jika tidak ada foto diunggah, gunakan gambar default dari Google Drive
+        driveFileId = "11vJgEVtglUa50h9P1hZcVf0ceqeVq5tJ";
+        photoUrl = "https://drive.google.com/file/d/11vJgEVtglUa50h9P1hZcVf0ceqeVq5tJ/view";
       }
 
       const excuse = await storage.createExcuse({
@@ -1497,119 +1464,6 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       console.error("Update excuse error:", error);
-      res.status(500).json({ message: "Server error" });
-    }
-  });
-
-  // STUDENT EXCUSE PHOTO UPLOAD
-  app.post("/api/student/upload-excuse-photo", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
-    try {
-      const { date, reason } = req.body;
-      const user = await storage.getUser(req.session.userId!);
-      
-      if (!user || user.role !== "siswa") {
-        return res.status(403).json({ message: "Hanya siswa yang bisa upload foto izin" });
-      }
-      
-      if (!req.file || !date || !reason) {
-        return res.status(400).json({ message: "Data tidak lengkap" });
-      }
-      
-      // Upload to Google Drive
-      const result = await uploadExcusePhoto(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-        user.identifier,
-        reason,
-        date
-      );
-      
-      if (!result) {
-        return res.status(500).json({ message: "Gagal upload foto" });
-      }
-      
-      // Save to database
-      const excuse = await storage.createExcuse({
-        userId: req.session.userId!,
-        date,
-        type: "izin",
-        reason,
-        photoUrl: result.webViewLink,
-        driveFileId: result.fileId,
-        status: "pending"
-      });
-      
-      res.json({
-        success: true,
-        message: "Foto izin berhasil diupload",
-        data: {
-          excuseId: excuse.id,
-          photoUrl: result.webViewLink,
-          fileId: result.fileId
-        }
-      });
-    } catch (error) {
-      console.error("Student excuse photo upload error:", error);
-      res.status(500).json({ message: "Server error" });
-    }
-  });
-
-  // GET STUDENT EXCUSE PHOTOS
-  app.get("/api/student/excuse-photos", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await storage.getUser(req.session.userId!);
-      
-      if (!user || user.role !== "siswa") {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      
-      const excuses = await storage.getExcusesByUser(req.session.userId!);
-      const photos = excuses
-        .filter(e => e.photoUrl && e.driveFileId)
-        .map(e => ({
-          id: e.id,
-          photoUrl: e.photoUrl,
-          fileName: `${e.reason}_${e.date}`,
-          uploadDate: e.date,
-          reason: e.reason,
-          type: e.type
-        }));
-      
-      res.json(photos);
-    } catch (error) {
-      console.error("Get excuse photos error:", error);
-      res.status(500).json({ message: "Server error" });
-    }
-  });
-
-  // DELETE EXCUSE PHOTO
-  app.delete("/api/student/excuse-photo/:id", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await storage.getUser(req.session.userId!);
-      
-      if (!user || user.role !== "siswa") {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      
-      const excuseId = parseInt(req.params.id);
-      const excuse = await storage.getExcuse(excuseId);
-      
-      if (!excuse || excuse.userId !== req.session.userId!) {
-        return res.status(404).json({ message: "Photo not found" });
-      }
-      
-      // Delete from Google Drive
-      if (excuse.driveFileId) {
-        await deletePhoto(excuse.driveFileId);
-      }
-      
-      // Update database
-      await storage.deleteExcuse(excuseId);
-      
-      res.json({ success: true, message: "Foto berhasil dihapus" });
-    } catch (error) {
-      console.error("Delete excuse photo error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

@@ -412,6 +412,17 @@ function ExcusesTab({ excuses, excuseStatusMutation }: { excuses?: any[]; excuse
                     </a>
                   </div>
                 )}
+                {/* Mobile view for photo */}
+                {e.photoUrl && (
+                  <div className="flex-shrink-0 sm:hidden">
+                    <a href={e.photoUrl} target="_blank" rel="noopener noreferrer" className="w-16 h-16 rounded-lg border flex items-center justify-center bg-muted hover:bg-muted/80 transition-colors" data-testid={`link-photo-mobile-${e.id}`}>
+                      <div className="text-center">
+                        <Image className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+                        <span className="text-[8px] text-primary">Foto</span>
+                      </div>
+                    </a>
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-1 sm:gap-2">
                     <div className="min-w-0">
