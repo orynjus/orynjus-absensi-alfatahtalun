@@ -1474,6 +1474,119 @@ export async function registerRoutes(
     }
   });
 
+  // STUDENT EXCUSE PHOTO UPLOAD
+  app.post("/api/student/upload-excuse-photo", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
+    try {
+      const { date, reason } = req.body;
+      const user = await storage.getUser(req.session.userId!);
+      
+      if (!user || user.role !== "siswa") {
+        return res.status(403).json({ message: "Hanya siswa yang bisa upload foto izin" });
+      }
+      
+      if (!req.file || !date || !reason) {
+        return res.status(400).json({ message: "Data tidak lengkap" });
+      }
+      
+      // Upload to Google Drive
+      const result = await uploadExcusePhoto(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        user.identifier,
+        reason,
+        date
+      );
+      
+      if (!result) {
+        return res.status(500).json({ message: "Gagal upload foto" });
+      }
+      
+      // Save to database
+      const excuse = await storage.createExcuse({
+        userId: req.session.userId!,
+        date,
+        type: "izin",
+        reason,
+        photoUrl: result.webViewLink,
+        driveFileId: result.fileId,
+        status: "pending"
+      });
+      
+      res.json({
+        success: true,
+        message: "Foto izin berhasil diupload",
+        data: {
+          excuseId: excuse.id,
+          photoUrl: result.webViewLink,
+          fileId: result.fileId
+        }
+      });
+    } catch (error) {
+      console.error("Student excuse photo upload error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // GET STUDENT EXCUSE PHOTOS
+  app.get("/api/student/excuse-photos", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      
+      if (!user || user.role !== "siswa") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const excuses = await storage.getExcusesByUser(req.session.userId!);
+      const photos = excuses
+        .filter(e => e.photoUrl && e.driveFileId)
+        .map(e => ({
+          id: e.id,
+          photoUrl: e.photoUrl,
+          fileName: `${e.reason}_${e.date}`,
+          uploadDate: e.date,
+          reason: e.reason,
+          type: e.type
+        }));
+      
+      res.json(photos);
+    } catch (error) {
+      console.error("Get excuse photos error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // DELETE EXCUSE PHOTO
+  app.delete("/api/student/excuse-photo/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      
+      if (!user || user.role !== "siswa") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const excuseId = parseInt(req.params.id);
+      const excuse = await storage.getExcuse(excuseId);
+      
+      if (!excuse || excuse.userId !== req.session.userId!) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      
+      // Delete from Google Drive
+      if (excuse.driveFileId) {
+        await deletePhoto(excuse.driveFileId);
+      }
+      
+      // Update database
+      await storage.deleteExcuse(excuseId);
+      
+      res.json({ success: true, message: "Foto berhasil dihapus" });
+    } catch (error) {
+      console.error("Delete excuse photo error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // ATTENDANCE HISTORY (for logged-in users)
   app.get("/api/attendance/history", requireAuth, async (req: Request, res: Response) => {
     const records = await storage.getUserAttendanceHistory(req.session.userId!);

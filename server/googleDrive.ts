@@ -1,75 +1,188 @@
-// Integration: Google Drive (connection:conn_google-drive_01KK5X8MNV44DMMVRK0X3PA3KW)
-import { ReplitConnectors } from "@replit/connectors-sdk";
+// Google Drive Integration for Upload Gambar Izin Siswa
+import { google } from 'googleapis';
 import { db } from './db';
-import { scannerSettings } from '@shared/schema';
 
-const DEFAULT_FOLDER_ID = '11vJgEVtglUa50h9P1hZcVf0ceqeVq5tJ';
+// OAuth2 Configuration
+const auth = new google.auth.OAuth2Client({
+  clientId: process.env.GOOGLE_DRIVE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+  redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback',
+});
 
-async function getDriveFolderId(): Promise<string> {
+const drive = google.drive({ version: 'v3', auth });
+
+// Constants
+const FOLDER_NAME = 'Absensi App';
+const EXCUSE_FOLDER = 'Izin Siswa';
+
+// Get or create main folder
+async function getOrCreateMainFolder(): Promise<string> {
   try {
-    const [settings] = await db.select({ googleDriveFolderId: scannerSettings.googleDriveFolderId }).from(scannerSettings).limit(1);
-    if (settings?.googleDriveFolderId) return settings.googleDriveFolderId;
-  } catch {}
-  return DEFAULT_FOLDER_ID;
+    // Search for existing folder
+    const response = await drive.files.list({
+      q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name)',
+    });
+
+    if (response.data.files?.length > 0) {
+      return response.data.files[0].id!;
+    }
+
+    // Create new folder if not exists
+    const createResponse = await drive.files.create({
+      requestBody: {
+        name: FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder',
+      },
+    });
+
+    return createResponse.data.id!;
+  } catch (error) {
+    console.error('Error getting/creating main folder:', error);
+    throw error;
+  }
 }
 
+// Get or create student excuse folder
+async function getOrCreateStudentFolder(studentId: number): Promise<string> {
+  try {
+    const mainFolderId = await getOrCreateMainFolder();
+    const studentFolderName = `Siswa_${studentId}`;
+
+    // Search for existing student folder
+    const response = await drive.files.list({
+      q: `name='${studentFolderName}' and '${mainFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name)',
+    });
+
+    if (response.data.files?.length > 0) {
+      return response.data.files[0].id!;
+    }
+
+    // Create new student folder
+    const createResponse = await drive.files.create({
+      requestBody: {
+        name: studentFolderName,
+        parents: [mainFolderId],
+        mimeType: 'application/vnd.google-apps.folder',
+      },
+    });
+
+    return createResponse.data.id!;
+  } catch (error) {
+    console.error('Error getting/creating student folder:', error);
+    throw error;
+  }
+}
+
+// Upload excuse photo to Google Drive
 export async function uploadExcusePhoto(
   fileBuffer: Buffer,
   fileName: string,
-  mimeType: string
+  mimeType: string,
+  studentId: number,
+  reason: string,
+  date: string
 ): Promise<{ fileId: string; webViewLink: string } | null> {
   try {
-    const FOLDER_ID = await getDriveFolderId();
-    const connectors = new ReplitConnectors();
+    // Get student folder
+    const studentFolderId = await getOrCreateStudentFolder(studentId);
+    
+    // Create unique filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const uniqueFileName = `${reason}_${timestamp}_${fileName}`;
 
-    const boundary = '-------314159265358979323846';
-    const metadata = JSON.stringify({
-      name: fileName,
-      parents: [FOLDER_ID],
-    });
-
-    const multipartBody = Buffer.concat([
-      Buffer.from(
-        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n`
-      ),
-      Buffer.from(fileBuffer.toString('base64')),
-      Buffer.from(`\r\n--${boundary}--`),
-    ]);
-
-    const response = await connectors.proxy("google-drive", "/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
-      method: "POST",
-      headers: {
-        'Content-Type': `multipart/related; boundary=${boundary}`,
+    // Upload file
+    const response = await drive.files.create({
+      requestBody: {
+        name: uniqueFileName,
+        parents: [studentFolderId],
       },
-      body: multipartBody.toString(),
+      media: {
+        mimeType,
+        body: fileBuffer,
+      },
     });
 
-    const responseText = await response.text();
-    console.log('Drive upload response status:', response.status);
-
-    if (response.status !== 200) {
-      console.error('Google Drive upload failed with status', response.status, ':', responseText.substring(0, 200));
+    if (!response.data.id) {
+      console.error('Upload failed: No file ID returned');
       return null;
     }
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseErr) {
-      console.error('Failed to parse Drive response as JSON:', responseText.substring(0, 200));
-      return null;
-    }
+    // Make file publicly viewable
+    await drive.permissions.create({
+      fileId: response.data.id,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
 
-    if (!data.id) {
-      console.error('Drive response missing file id:', data);
-      return null;
-    }
-
-    console.log('File uploaded to Google Drive:', data.id);
-    const webViewLink = data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`;
-    return { fileId: data.id, webViewLink };
+    const webViewLink = response.data.webViewLink || `https://drive.google.com/file/d/${response.data.id}/view`;
+    
+    console.log(`Photo uploaded for student ${studentId}:`, uniqueFileName);
+    
+    return {
+      fileId: response.data.id,
+      webViewLink,
+    };
   } catch (error) {
     console.error('Failed to upload to Google Drive:', error);
     return null;
   }
+}
+
+// Get all photos for a student
+export async function getStudentPhotos(studentId: number): Promise<Array<{
+  id: string;
+  webViewLink: string;
+  fileName: string;
+  uploadDate: string;
+  reason: string;
+}>> {
+  try {
+    const studentFolderId = await getOrCreateStudentFolder(studentId);
+    
+    const response = await drive.files.list({
+      q: `'${studentFolderId}' in parents and trashed=false`,
+      fields: 'files(id, name, webViewLink, createdTime)',
+      orderBy: 'createdTime desc',
+    });
+
+    return response.data.files?.map(file => ({
+      id: file.id!,
+      webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
+      fileName: file.name!,
+      uploadDate: file.createdTime!,
+      reason: file.name?.split('_')[0] || 'Unknown',
+    })) || [];
+  } catch (error) {
+    console.error('Failed to get student photos:', error);
+    return [];
+  }
+}
+
+// Delete photo from Google Drive
+export async function deletePhoto(fileId: string): Promise<boolean> {
+  try {
+    await drive.files.delete({
+      fileId,
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to delete photo:', error);
+    return false;
+  }
+}
+
+// Generate OAuth URL for frontend
+export function getAuthUrl(): string {
+  return auth.generateAuthUrl({
+    access_type: 'offline',
+    scope: [
+      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/drive.appfolder',
+    ],
+    prompt: 'consent',
+  });
 }
