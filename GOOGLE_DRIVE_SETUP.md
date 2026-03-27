@@ -7,6 +7,7 @@
 - Otomatis tersimpan ke Google Drive
 - Generate shareable link
 - Integrasi dengan sistem absensi
+- Admin bisa view semua foto
 
 ## 🔧 Setup Google Drive API
 
@@ -58,7 +59,7 @@ Absensi App/
 ## 🔄 Flow Integration
 
 ### **Upload Process:**
-1. **Siswa Upload** foto/bukti izin
+1. **Siswa Upload** foto/bukti izin via web
 2. **System compress** gambar
 3. **Upload ke Google Drive** folder spesifik
 4. **Generate shareable link**
@@ -67,116 +68,49 @@ Absensi App/
 
 ### **API Endpoints:**
 ```typescript
-// Upload izin photo
-POST /api/excuses/upload-photo
+// Upload izin photo (Siswa)
+POST /api/student/upload-excuse-photo
 {
-  "file": "base64_image_data",
-  "studentId": 123,
-  "reason": "sakit",
-  "date": "2024-01-15"
+  "photo": "file",
+  "date": "2024-01-15",
+  "reason": "sakit"
 }
 
-// Get photo links
-GET /api/excuses/photos/:studentId
+// Get photo links (Siswa)
+GET /api/student/excuse-photos
 Response: [
   {
     "id": "drive_file_id",
     "webViewLink": "https://drive.google.com/file/d/ID/view",
-    "uploadDate": "2024-01-15T10:00:00Z"
+    "fileName": "sakit_2024-01-15_foto.jpg",
+    "uploadDate": "2024-01-15T10:00:00Z",
+    "reason": "sakit"
   }
 ]
+
+// Delete photo (Siswa)
+DELETE /api/student/excuse-photo/:id
 ```
 
-## 🛠️ Implementation Steps
+## 🛠️ Implementation Status
 
-### 1. **Update googleDrive.ts**
-```typescript
-import { google } from 'googleapis';
+### ✅ **Sudah Diimplementasikan:**
 
-// OAuth2 client setup
-const auth = new google.auth.OAuth2Client({
-  clientId: process.env.GOOGLE_DRIVE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
-  redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI,
-});
+1. **Google Drive API Integration**
+   - OAuth2 client setup
+   - Folder management otomatis
+   - File upload dengan metadata
+   - Public sharing links
 
-// Drive service setup
-const drive = google.drive({ version: 'v3', auth });
+2. **API Endpoints**
+   - `POST /api/student/upload-excuse-photo`
+   - `GET /api/student/excuse-photos`
+   - `DELETE /api/student/excuse-photo/:id`
 
-export async function uploadExcusePhoto(
-  fileBuffer: Buffer,
-  fileName: string,
-  studentId: number,
-  reason: string
-): Promise<{ fileId: string; webViewLink: string } | null> {
-  try {
-    // Create folder structure if not exists
-    const folderId = await createStudentFolder(studentId);
-    
-    // Upload file
-    const response = await drive.files.create({
-      requestBody: {
-        name: fileName,
-        parents: [folderId],
-      },
-      media: {
-        mimeType: 'image/jpeg',
-        body: fileBuffer,
-      },
-    });
-
-    // Make file publicly viewable
-    await drive.permissions.create({
-      fileId: response.data.id!,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
-
-    return {
-      fileId: response.data.id!,
-      webViewLink: response.data.webViewLink!,
-    };
-  } catch (error) {
-    console.error('Upload failed:', error);
-    return null;
-  }
-}
-```
-
-### 2. **Database Schema Update**
-```typescript
-// Add to excuses table
-{
-  photoFileId: string | null,
-  photoUrl: string | null,
-  uploadDate: timestamp | null
-}
-```
-
-### 3. **Frontend Integration**
-```typescript
-// Upload component
-const handlePhotoUpload = async (file: File) => {
-  const base64 = await fileToBase64(file);
-  
-  const response = await fetch('/api/excuses/upload-photo', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      file: base64,
-      studentId: student.id,
-      reason: excuseData.reason
-    })
-  });
-  
-  if (response.ok) {
-    const data = await response.json();
-    setPhotoUrl(data.webViewLink);
-  }
-};
-```
+3. **Security Features**
+   - Role-based access control (siswa only)
+   - File validation dan error handling
+   - Session authentication
 
 ## 🔐 Security & Privacy
 
@@ -207,11 +141,30 @@ GOOGLE_DRIVE_CLIENT_SECRET=GOCSPX-xxx
 GOOGLE_DRIVE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 ```
 
-## ✅ Status: READY TO IMPLEMENT
+## ✅ Status: IMPLEMENTED & DEPLOYED
 
 🔥 **Google Drive API ready**  
-🔥 **Upload flow designed**  
-🔥 **Security planned**  
-🔥 **Integration points clear**  
+🔥 **Upload endpoints working**  
+🔥 **Security implemented**  
+🔥 **Database integration complete**  
+🔥 **Documentation lengkap**  
 
-**Sistem siap untuk implementasi upload gambar izin siswa!** 🎉
+**Sistem siap untuk upload gambar izin siswa!** 🎉
+
+## 📱 Cara Penggunaan
+
+### **Untuk Siswa:**
+1. Login ke dashboard siswa
+2. Klik "Upload Foto Izin"
+3. Pilih file gambar
+4. Isi tanggal dan alasan
+5. Upload - otomatis tersimpan ke Google Drive
+6. Link viewable otomatis dibuat
+
+### **Untuk Admin:**
+1. Login ke dashboard admin
+2. Lihat semua foto izin siswa
+3. Download/view foto jika diperlukan
+4. Manage permissions
+
+**Integrasi Google Drive sudah siap digunakan!** 🚀
