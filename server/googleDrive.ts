@@ -178,6 +178,11 @@ export async function uploadExcusePhoto(
 
     // Upload file
     console.log('Starting file upload...');
+    
+    // Create a readable stream from buffer
+    const { Readable } = await import('stream');
+    const fileStream = Readable.from([fileBuffer]);
+    
     const response = await drive.files.create({
       requestBody: {
         name: uniqueFileName,
@@ -185,7 +190,7 @@ export async function uploadExcusePhoto(
       },
       media: {
         mimeType,
-        body: fileBuffer, // This is the correct way to pass buffer
+        body: fileStream, // Use stream instead of buffer
       },
     });
     console.log('Upload response:', response.data);
