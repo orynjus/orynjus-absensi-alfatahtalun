@@ -1,62 +1,163 @@
-// Integration: Google Sheets (connection:conn_google-sheet_01KK65XEJ8ER8YYFKDG3JJZX8F)
-import { google } from 'googleapis';
+// Integration: Google Sheets (Apps Script Web App)
 import { db } from './db';
 import { scannerSettings } from '@shared/schema';
 
-let connectionSettings: any;
-
-const DEFAULT_SPREADSHEET_ID = '1LgFgRFsgM_Rggu0ZegFBtHBIeh5gkVSnQ-rudSb_MvY';
-
-async function getSpreadsheetId(): Promise<string> {
+async function getGoogleSheetsUrl(): Promise<string> {
   try {
     const [settings] = await db.select({ googleSheetId: scannerSettings.googleSheetId }).from(scannerSettings).limit(1);
     if (settings?.googleSheetId) return settings.googleSheetId;
   } catch {}
-  return DEFAULT_SPREADSHEET_ID;
-}
-
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X-Replit-Token not found for repl/depl');
-  }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-sheet',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X-Replit-Token': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Google Sheet not connected');
-  }
-  return accessToken;
-}
-
-async function getUncachableGoogleSheetClient() {
-  const accessToken = await getAccessToken();
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-  return google.sheets({ version: 'v4', auth: oauth2Client });
+  // Fallback ke URL yang Anda berikan
+  return 'https://script.google.com/macros/s/AKfycbxvf2IXArzFnDNG0L1aIjzI_HqtdOlKtrDfs0NAL-cmd81BDBGutbR_Usp3EBheKvLd/exec';
 }
 
 export async function appendAttendanceRow(data: {
+  tanggal: string;
+  nama: string;
+  nisnNip: string;
+  kelas: string;
+  jamDatang: string;
+  jamPulang: string;
+  status: string;
+  role: string;
+}) {
+  try {
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'append',
+        tanggal: data.tanggal,
+        nama: data.nama,
+        nisnNip: data.nisnNip,
+        kelas: data.kelas,
+        jamDatang: data.jamDatang,
+        jamPulang: data.jamPulang,
+        status: data.status,
+        role: data.role
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Google Sheets append result:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Failed to append to Google Sheets:', error);
+    // Don't throw error to avoid breaking attendance flow
+    return null;
+  }
+}
+
+export async function updateAttendanceRow(data: {
+  tanggal: string;
+  nama: string;
+  nisnNip: string;
+  kelas: string;
+  jamDatang: string;
+  jamPulang: string;
+  status: string;
+  role: string;
+}) {
+  try {
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'update',
+        tanggal: data.tanggal,
+        nama: data.nama,
+        nisnNip: data.nisnNip,
+        kelas: data.kelas,
+        jamDatang: data.jamDatang,
+        jamPulang: data.jamPulang,
+        status: data.status,
+        role: data.role
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Google Sheets update result:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Failed to update Google Sheets:', error);
+    // Don't throw error to avoid breaking attendance flow
+    return null;
+  }
+}
+
+export async function clearAttendanceSheet() {
+  try {
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'clear'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Google Sheets clear result:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Failed to clear Google Sheets:', error);
+    // Don't throw error to avoid breaking attendance flow
+    return null;
+  }
+}
+
+export async function testGoogleSheetsConnection() {
+  try {
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'ping'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Google Sheets ping result:', result);
+    return { success: true, message: result.message };
+  } catch (error: any) {
+    console.error('Failed to ping Google Sheets:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Legacy function untuk compatibility
+export async function sheetAppendAttendance(data: {
   date: string;
   name: string;
   identifier: string;
@@ -66,126 +167,89 @@ export async function appendAttendanceRow(data: {
   status: string;
   role: string;
 }) {
-  try {
-    const SPREADSHEET_ID = await getSpreadsheetId();
-    const sheets = await getUncachableGoogleSheetClient();
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A:H',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [[
-          data.date,
-          data.name,
-          data.identifier,
-          data.className || '-',
-          data.checkInTime || '-',
-          data.checkOutTime || '-',
-          data.status,
-          data.role,
-        ]]
-      }
-    });
-    console.log('Attendance row appended to Google Sheets');
-  } catch (error) {
-    console.error('Failed to append to Google Sheets:', error);
-  }
-}
-
-export async function updateAttendanceRow(date: string, identifier: string, checkOutTime: string, status: string) {
-  try {
-    const SPREADSHEET_ID = await getSpreadsheetId();
-    const sheets = await getUncachableGoogleSheetClient();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A:H',
-    });
-    const rows = response.data.values || [];
-    let rowIndex = -1;
-    for (let i = rows.length - 1; i >= 0; i--) {
-      if (rows[i][0] === date && rows[i][2] === identifier) {
-        rowIndex = i;
-        break;
-      }
-    }
-    if (rowIndex >= 0) {
-      const rowNum = rowIndex + 1;
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `Sheet1!F${rowNum}:G${rowNum}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [[checkOutTime, status]]
-        }
-      });
-      console.log(`Attendance row ${rowNum} updated in Google Sheets (checkout)`);
-    } else {
-      console.log('No matching row found for update, skipping');
-    }
-  } catch (error) {
-    console.error('Failed to update attendance row in Google Sheets:', error);
-  }
-}
-
-export async function readUsersFromSheet(sheetTab: string): Promise<string[][]> {
-  const SPREADSHEET_ID = await getSpreadsheetId();
-  const sheets = await getUncachableGoogleSheetClient();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheetTab}!A2:Z1000`,
+  return appendAttendanceRow({
+    tanggal: data.date,
+    nama: data.name,
+    nisnNip: data.identifier,
+    kelas: data.className || '-',
+    jamDatang: data.checkInTime || '-',
+    jamPulang: data.checkOutTime || '-',
+    status: data.status,
+    role: data.role
   });
-  return response.data.values || [];
+}
+
+export async function sheetUpdateAttendance(date: string, identifier: string, checkOutTime: string, status: string) {
+  return updateAttendanceRow({
+    tanggal: date,
+    nama: '',
+    nisnNip: identifier,
+    kelas: '',
+    jamDatang: '',
+    jamPulang: checkOutTime,
+    status: status,
+    role: ''
+  });
+}
+
+export async function sheetClearAttendance() {
+  return clearAttendanceSheet();
+}
+
+export async function testWebhook() {
+  return testGoogleSheetsConnection();
+}
+
+// Additional exports for compatibility
+export async function readUsersFromSheet(tab: string): Promise<string[][]> {
+  try {
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'read',
+        tab: tab
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.data || [];
+  } catch (error: any) {
+    console.error('Failed to read from Google Sheets:', error);
+    return [];
+  }
 }
 
 export async function getSheetTabs(): Promise<string[]> {
-  const SPREADSHEET_ID = await getSpreadsheetId();
-  const sheets = await getUncachableGoogleSheetClient();
-  const info = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
-  return info.data.sheets?.map((s: any) => s.properties.title) || [];
-}
-
-export async function clearAttendanceSheet() {
   try {
-    const SPREADSHEET_ID = await getSpreadsheetId();
-    const sheets = await getUncachableGoogleSheetClient();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A:H',
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'tabs'
+      })
     });
-    const rowCount = response.data.values?.length || 0;
-    if (rowCount > 1) {
-      await sheets.spreadsheets.values.clear({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `Sheet1!A2:H${rowCount}`,
-      });
-    }
-    console.log(`Cleared ${rowCount - 1} attendance rows from Google Sheets`);
-    return { cleared: rowCount - 1 };
-  } catch (error) {
-    console.error('Failed to clear Google Sheets attendance:', error);
-    throw error;
-  }
-}
 
-export async function initSheetHeaders() {
-  try {
-    const SPREADSHEET_ID = await getSpreadsheetId();
-    const sheets = await getUncachableGoogleSheetClient();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A1:H1',
-    });
-    if (!response.data.values || response.data.values.length === 0) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Sheet1!A1:H1',
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [['Tanggal', 'Nama', 'NISN/NIP', 'Kelas', 'Jam Datang', 'Jam Pulang', 'Status', 'Role']]
-        }
-      });
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
     }
-  } catch (error) {
-    console.error('Failed to init sheet headers:', error);
+
+    const result = await response.json();
+    return result.tabs || [];
+  } catch (error: any) {
+    console.error('Failed to get sheet tabs:', error);
+    return ['Sheet1'];
   }
 }
