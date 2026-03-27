@@ -292,6 +292,35 @@ export async function registerRoutes(
     }
   });
 
+  // Google OAuth callback route
+  app.get("/auth/google/callback", async (req: Request, res: Response) => {
+    try {
+      const { code } = req.query;
+      if (!code) {
+        return res.status(400).json({ message: "Authorization code is required" });
+      }
+
+      const { tokens } = await auth.getToken(code as string);
+      auth.setCredentials(tokens);
+
+      // Save credentials
+      const credentialsPath = path.join(process.cwd(), 'google-credentials.json');
+      fs.writeFileSync(credentialsPath, JSON.stringify({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expiry_date: tokens.expiry_date,
+      }, null, 2));
+
+      console.log('Google Drive credentials saved successfully');
+      
+      // Redirect to frontend with success
+      res.redirect('https://clever-generosity-production-b5a4.up.railway.app?google_drive_connected=true');
+    } catch (error) {
+      console.error('Error handling OAuth callback:', error);
+      res.redirect('https://clever-generosity-production-b5a4.up.railway.app?google_drive_error=true');
+    }
+  });
+
   app.post("/api/google-drive/callback", requireRole("admin"), async (req: Request, res: Response) => {
     try {
       const { code } = req.body;

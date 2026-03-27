@@ -701,6 +701,24 @@ function SettingsTab() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Handle OAuth callback from URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isConnected = urlParams.get('google_drive_connected');
+    const hasError = urlParams.get('google_drive_error');
+    
+    if (isConnected === 'true') {
+      toast({ title: "Google Drive berhasil terhubung!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/google-drive/status"] });
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (hasError === 'true') {
+      toast({ title: "Gagal menghubungkan Google Drive", variant: "destructive" });
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const handleOAuthCallback = async (code: string) => {
     setGoogleDriveLoading(true);
     try {
