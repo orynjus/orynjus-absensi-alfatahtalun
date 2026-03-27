@@ -259,6 +259,10 @@ export async function deletePhoto(fileId: string): Promise<boolean> {
 
 // Generate OAuth URL for frontend
 export function getAuthUrl(): string {
+  if (!process.env.GOOGLE_DRIVE_CLIENT_ID) {
+    throw new Error('GOOGLE_DRIVE_CLIENT_ID not configured');
+  }
+  
   return auth.generateAuthUrl({
     access_type: 'offline',
     scope: [
@@ -266,6 +270,8 @@ export function getAuthUrl(): string {
       'https://www.googleapis.com/auth/drive.appfolder',
     ],
     prompt: 'consent',
+    client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
+    redirect_uri: process.env.GOOGLE_DRIVE_REDIRECT_URI,
   });
 }
 
