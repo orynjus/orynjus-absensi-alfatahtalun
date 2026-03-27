@@ -204,13 +204,16 @@ export async function registerRoutes(
     })
   );
 
-  // HEALTH CHECK ENDPOINT for Railway - MUST BE FIRST (before any async operations)
+  // RAILWAY HEALTH CHECK - Ultra Minimal (MUST BE FIRST)
   app.get("/api/health", (req, res) => {
-    res.status(200).json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      service: "absensi-app"
-    });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{"status":"ok","service":"absensi-app"}');
+  });
+
+  // SIMPLE TEST ENDPOINT
+  app.get("/", (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<h1>Absensi App - Running</h1><p><a href="/api/health">Health Check</a></p>');
   });
 
   await seedData();
