@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: absensi-alfatah
+    name: absensi-app
     runtime: node
     plan: free
     region: singapore
@@ -10,10 +10,12 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 5000
+        value: 3000
       - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_x9bFvPBOco3I@ep-little-firefly-a10aet33-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
         sync: false
       - key: SESSION_SECRET
-        generateValue: true
+        value: absensi_secret_key_2024
+        generateValue: false
       - key: FONNTE_TOKEN
         sync: false
