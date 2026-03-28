@@ -3,12 +3,17 @@ import { db } from './db';
 import { scannerSettings } from '@shared/schema';
 
 async function getGoogleSheetsUrl(): Promise<string> {
+  // Force use working Apps Script Web App URL
+  return 'https://script.google.com/macros/s/AKfycbxvf2IXArzFnDNG0L1aIjzI_HqtdOlKtrDfs0NAL-cmd81BDBGutbR_Usp3EBheKvLd/exec';
+  
+  // Old code with database issue - commented out
+  /*
   try {
     const [settings] = await db.select({ googleSheetId: scannerSettings.googleSheetId }).from(scannerSettings).limit(1);
     if (settings?.googleSheetId) return settings.googleSheetId;
   } catch {}
-  // Fallback ke URL yang Anda berikan
   return 'https://script.google.com/macros/s/AKfycbxvf2IXArzFnDNG0L1aIjzI_HqtdOlKtrDfs0NAL-cmd81BDBGutbR_Usp3EBheKvLd/exec';
+  */
 }
 
 export async function appendAttendanceRow(data: {
