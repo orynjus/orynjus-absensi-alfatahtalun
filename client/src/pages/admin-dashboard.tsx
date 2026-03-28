@@ -106,6 +106,7 @@ function OverviewTab() {
     return res.json();
   }});
   const [expandedStatus, setExpandedStatus] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -144,13 +145,28 @@ function OverviewTab() {
   const allNonAdmin = [...students, ...teachers];
   const belumScanList = allNonAdmin.filter(u => !attendedIds.has(u.id));
 
+  // Filter function for search
+  const filterBySearch = (items: any[], isBelumScan: boolean = false) => {
+    if (!searchQuery.trim()) return items;
+    
+    const query = searchQuery.toLowerCase();
+    return items.filter(item => {
+      const user = isBelumScan ? item : item.user;
+      return (
+        (user?.name || "").toLowerCase().includes(query) ||
+        (user?.identifier || "").toLowerCase().includes(query) ||
+        (user?.className || "").toLowerCase().includes(query)
+      );
+    });
+  };
+
   const statusSections = [
-    { key: "hadir", label: "Hadir", count: hadirList.length, color: "bg-green-500", list: hadirList, icon: "✓" },
-    { key: "telat", label: "Terlambat", count: telatList.length, color: "bg-yellow-500", list: telatList, icon: "⏰" },
-    { key: "pulang", label: "Sudah Pulang", count: pulangList.length, color: "bg-blue-500", list: pulangList, icon: "🏠" },
-    { key: "izin", label: "Izin/Sakit", count: izinList.length, color: "bg-orange-500", list: izinList, icon: "📋" },
-    { key: "alpha", label: "Alpha", count: alphaList.length, color: "bg-red-500", list: alphaList, icon: "✗" },
-    { key: "belum", label: "Belum Scan", count: belumScanList.length, color: "bg-gray-400", list: belumScanList, icon: "—" },
+    { key: "hadir", label: "Hadir", count: filterBySearch(hadirList).length, color: "bg-green-500", list: filterBySearch(hadirList), icon: "✓" },
+    { key: "telat", label: "Terlambat", count: filterBySearch(telatList).length, color: "bg-yellow-500", list: filterBySearch(telatList), icon: "⏰" },
+    { key: "pulang", label: "Sudah Pulang", count: filterBySearch(pulangList).length, color: "bg-blue-500", list: filterBySearch(pulangList), icon: "🏠" },
+    { key: "izin", label: "Izin/Sakit", count: filterBySearch(izinList).length, color: "bg-orange-500", list: filterBySearch(izinList), icon: "📋" },
+    { key: "alpha", label: "Alpha", count: filterBySearch(alphaList).length, color: "bg-red-500", list: filterBySearch(alphaList), icon: "✗" },
+    { key: "belum", label: "Belum Scan", count: filterBySearch(belumScanList, true).length, color: "bg-gray-400", list: filterBySearch(belumScanList, true), icon: "—" },
   ];
 
   return (
@@ -178,6 +194,34 @@ function OverviewTab() {
       </div>
 
       <h3 className="text-sm sm:text-lg font-semibold mb-3">Kehadiran Hari Ini — {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</h3>
+      
+      {/* Search Input */}
+      <div className="mb-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder="Cari berdasarkan nama, NISN/NIP, atau kelas..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-overview"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              data-testid="button-clear-search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Menampilkan {statusSections.reduce((sum, s) => sum + s.count, 0)} hasil dari {(todayAttendance?.length || 0) + (allNonAdmin?.length || 0)} total data
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
         {statusSections.map(s => (
           <button
@@ -212,6 +256,7 @@ function OverviewTab() {
                       <tr>
                         <th className="px-3 py-2 text-left text-xs">#</th>
                         <th className="px-3 py-2 text-left text-xs">Nama</th>
+                        <th className="px-3 py-2 text-left text-xs">NISN/NIP</th>
                         <th className="px-3 py-2 text-left text-xs">Kelas</th>
                         <th className="px-3 py-2 text-left text-xs">Role</th>
                         {!isBelumScan && <th className="px-3 py-2 text-left text-xs">Jam Datang</th>}
@@ -226,7 +271,8 @@ function OverviewTab() {
                         return (
                           <tr key={i} className="border-t" data-testid={`row-status-${expandedStatus}-${i}`}>
                             <td className="px-3 py-1.5 text-xs text-muted-foreground">{i + 1}</td>
-                            <td className="px-3 py-1.5 text-xs">{user?.name || "-"}</td>
+                            <td className="px-3 py-1.5 text-xs font-medium">{user?.name || "-"}</td>
+                            <td className="px-3 py-1.5 text-xs font-mono">{user?.identifier || "-"}</td>
                             <td className="px-3 py-1.5 text-xs">{user?.className || "-"}</td>
                             <td className="px-3 py-1.5 text-xs">
                               <Badge variant="outline" className="text-xs">{roleLabel[user?.role] || user?.role || "-"}</Badge>
