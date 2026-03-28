@@ -10,7 +10,7 @@ function doPost(e) {
 
     if (data.action === "init_headers") {
       if (sheet.getLastRow() === 0) {
-        sheet.appendRow(["Tanggal","Nama","NISN/NIP","Kelas","Jam Datang","Jam Pulang","Status","Role"]);
+        sheet.appendRow(["Tanggal","Nama","NISN/NIP","Kelas","Jam Datang","Jam Pulang","Status","Role","Keterangan"]);
       }
       return ok("headers initialized");
     }
@@ -35,23 +35,33 @@ function doPost(e) {
         if (rowDate === String(data.tanggal).trim() && rowId === targetId) {
           const existingJamDatang = values[i][4] || ""; // Column 5: Jam Datang
           const existingJamPulang = values[i][5] || ""; // Column 6: Jam Pulang
+          const existingKeterangan = values[i][7] || ""; // Column 8: Keterangan
           
           if (!existingJamPulang && data.jamDatang) {
+            // Check-in pertama: isi jam datang dan keterangan
             sheet.getRange(i + 1, 5).setValue(data.jamDatang);
-            console.log(`SUCCESS: Check-in pertama - jam datang = ${data.jamDatang}`);
+            const keterangan = `Check-in: ${data.jamDatang}`;
+            sheet.getRange(i + 1, 8).setValue(keterangan);
+            console.log(`SUCCESS: Check-in pertama - jam datang = ${data.jamDatang}, keterangan = ${keterangan}`);
             return ok("check-in pertama berhasil");
           }
           
           if (existingJamDatang && !existingJamPulang && data.jamPulang) {
+            // Check-out pertama: isi jam pulang dan update keterangan
             sheet.getRange(i + 1, 6).setValue(data.jamPulang);
-            console.log(`SUCCESS: Check-out pertama - jam pulang = ${data.jamPulang}`);
+            const keterangan = `${existingKeterangan} | Check-out: ${data.jamPulang}`;
+            sheet.getRange(i + 1, 8).setValue(keterangan);
+            console.log(`SUCCESS: Check-out pertama - jam pulang = ${data.jamPulang}, keterangan = ${keterangan}`);
             return ok("check-out pertama berhasil");
           }
           
           if (existingJamDatang && existingJamPulang && data.jamDatang && data.jamPulang) {
+            // Update kedua-dua: update jam datang, jam pulang, dan keterangan
             sheet.getRange(i + 1, 5).setValue(data.jamDatang);
             sheet.getRange(i + 1, 6).setValue(data.jamPulang);
-            console.log(`SUCCESS: Update jam datang = ${data.jamDatang}, jam pulang = ${data.jamPulang}`);
+            const keterangan = `Check-in: ${data.jamDatang} | Check-out: ${data.jamPulang}`;
+            sheet.getRange(i + 1, 8).setValue(keterangan);
+            console.log(`SUCCESS: Update jam datang = ${data.jamDatang}, jam pulang = ${data.jamPulang}, keterangan = ${keterangan}`);
             return ok("update jam datang dan pulang berhasil");
           }
           
@@ -61,7 +71,8 @@ function doPost(e) {
       
       sheet.appendRow([
         data.tanggal, data.nama, data.nisnNip, data.kelas,
-        data.jamDatang, data.jamPulang, data.status, data.role
+        data.jamDatang, data.jamPulang, data.status, data.role, 
+        data.jamDatang ? `Check-in: ${data.jamDatang}` : ""
       ]);
       return ok("appended new row");
     }
