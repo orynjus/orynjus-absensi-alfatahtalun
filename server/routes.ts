@@ -1383,6 +1383,34 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  // Public test endpoint for debugging
+  app.post("/api/test/webhook", async (_req: Request, res: Response) => {
+    try {
+      const result = await testWebhook();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Webhook test error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Health check endpoint for Koyeb
+  app.get("/api/health", (_req: Request, res: Response) => {
+    const uptime = process.uptime();
+    const memory = process.memoryUsage();
+    
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(uptime),
+      memory: {
+        used: Math.round(memory.heapUsed / 1024 / 1024),
+        total: Math.round(memory.heapTotal / 1024 / 1024),
+        rss: Math.round(memory.rss / 1024 / 1024)
+      }
+    });
+  });
+
   app.get("/api/admin/attendance", requireRole("admin"), async (req: Request, res: Response) => {
     const { startDate, endDate, className, role, status } = req.query;
     const records = await storage.getAttendanceFiltered({
