@@ -97,8 +97,8 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Railway provides PORT dynamically
-  const port = parseInt(process.env.PORT || "3000", 10);
+  // Railway/Koyeb provides PORT dynamically
+  const port = parseInt(process.env.PORT || "5000", 10);
   const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
   
   // Add health check before server starts
