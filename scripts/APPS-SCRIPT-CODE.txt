@@ -16,9 +16,11 @@ function doPost(e) {
     }
 
     if (data.action === "append") {
-      // Check existing row first
       const values = sheet.getDataRange().getValues();
       const tz = Session.getScriptTimeZone();
+      
+      console.log("APPEND request:", data);
+      console.log("Sheet rows:", values.length);
       
       for (let i = values.length - 1; i >= 1; i--) {
         const cellDate = values[i][0];
@@ -28,17 +30,35 @@ function doPost(e) {
         const rowId = String(values[i][2]).trim().replace(/\.0+$/, "");
         const targetId = String(data.nisnNip).trim().replace(/\.0+$/, "");
         
+        console.log(`Row ${i}: date="${rowDate}" vs "${data.tanggal}", id="${rowId}" vs "${targetId}"`);
+        
         if (rowDate === String(data.tanggal).trim() && rowId === targetId) {
-          // UPDATE existing row
-          sheet.getRange(i + 1, 5).setValue(data.jamDatang);
-          sheet.getRange(i + 1, 6).setValue(data.jamPulang);
-          sheet.getRange(i + 1, 7).setValue(data.status);
-          sheet.getRange(i + 1, 8).setValue(data.role);
-          return ok("updated existing row");
+          const existingJamDatang = values[i][4] || ""; // Column 5: Jam Datang
+          const existingJamPulang = values[i][5] || ""; // Column 6: Jam Pulang
+          
+          if (!existingJamPulang && data.jamDatang) {
+            sheet.getRange(i + 1, 5).setValue(data.jamDatang);
+            console.log(`SUCCESS: Check-in pertama - jam datang = ${data.jamDatang}`);
+            return ok("check-in pertama berhasil");
+          }
+          
+          if (existingJamDatang && !existingJamPulang && data.jamPulang) {
+            sheet.getRange(i + 1, 6).setValue(data.jamPulang);
+            console.log(`SUCCESS: Check-out pertama - jam pulang = ${data.jamPulang}`);
+            return ok("check-out pertama berhasil");
+          }
+          
+          if (existingJamDatang && existingJamPulang && data.jamDatang && data.jamPulang) {
+            sheet.getRange(i + 1, 5).setValue(data.jamDatang);
+            sheet.getRange(i + 1, 6).setValue(data.jamPulang);
+            console.log(`SUCCESS: Update jam datang = ${data.jamDatang}, jam pulang = ${data.jamPulang}`);
+            return ok("update jam datang dan pulang berhasil");
+          }
+          
+          return ok("row sudah lengkap, tidak perlu update");
         }
       }
       
-      // Only append if NOT found
       sheet.appendRow([
         data.tanggal, data.nama, data.nisnNip, data.kelas,
         data.jamDatang, data.jamPulang, data.status, data.role
