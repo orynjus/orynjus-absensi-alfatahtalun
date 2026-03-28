@@ -20,6 +20,8 @@ export interface IStorage {
 
   getAttendance(userId: number, date: string): Promise<Attendance | undefined>;
   getAttendanceByDate(date: string): Promise<Attendance[]>;
+  getAttendanceByUserAndDate(userId: number, date: string): Promise<Attendance | undefined>;
+  getAllAttendance(): Promise<Attendance[]>;
   getAttendanceFiltered(filters: { startDate?: string; endDate?: string; className?: string; role?: string; status?: string }): Promise<(Attendance & { user: User })[]>;
   createAttendance(data: InsertAttendance): Promise<Attendance>;
   updateAttendance(id: number, data: Partial<InsertAttendance>): Promise<Attendance | undefined>;
@@ -28,6 +30,7 @@ export interface IStorage {
 
   getExcuse(id: number): Promise<Excuse | undefined>;
   getExcuses(userId?: number): Promise<(Excuse & { user?: User })[]>;
+  getAllExcuses(): Promise<Excuse[]>;
   getExcusesByClass(className: string): Promise<(Excuse & { user?: User })[]>;
   createExcuse(data: InsertExcuse): Promise<Excuse>;
   updateExcuseStatus(id: number, status: "approved" | "rejected"): Promise<Excuse | undefined>;
@@ -94,6 +97,16 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(attendance).where(eq(attendance.date, date));
   }
 
+  async getAttendanceByUserAndDate(userId: number, date: string): Promise<Attendance | undefined> {
+    const [record] = await db.select().from(attendance)
+      .where(and(eq(attendance.userId, userId), eq(attendance.date, date)));
+    return record;
+  }
+
+  async getAllAttendance(): Promise<Attendance[]> {
+    return await db.select().from(attendance).orderBy(desc(attendance.date));
+  }
+
   async getAttendanceFiltered(filters: { startDate?: string; endDate?: string; className?: string; role?: string; status?: string }): Promise<(Attendance & { user: User })[]> {
     const conditions = [];
     if (filters.startDate) conditions.push(gte(attendance.date, filters.startDate));
@@ -155,6 +168,10 @@ export class DatabaseStorage implements IStorage {
       results.push({ ...excuse, user: user || undefined });
     }
     return results;
+  }
+
+  async getAllExcuses(): Promise<Excuse[]> {
+    return await db.select().from(excuses).orderBy(desc(excuses.createdAt));
   }
 
   async getExcusesByClass(className: string): Promise<(Excuse & { user?: User })[]> {

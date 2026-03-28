@@ -6,7 +6,7 @@ import multer from "multer";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { loginSchema, insertUserSchema, insertHolidaySchema } from "@shared/schema";
-import { readUsersFromSheet, getSheetTabs, sheetAppendAttendance, sheetUpdateAttendance, sheetClearAttendance, sheetInitHeaders, testWebhook } from "./googleSheets";
+import { readUsersFromSheet, getSheetTabs, sheetAppendAttendance, sheetUpdateAttendance, sheetClearAttendance, sheetInitHeaders, testWebhook, APPS_SCRIPT_CODE } from "./googleSheets";
 import { uploadExcusePhoto, getAuthUrl, auth } from "./googleDrive";
 import { sendCheckInNotification, sendLateNotification, sendCheckOutNotification, sendManualAttendanceNotification, sendExcuseNotificationToHomeroom, sendAlphaNotification, sendTestNotification } from "./fonnte";
 import crypto from "crypto";
@@ -1463,6 +1463,98 @@ export async function registerRoutes(
       res.status(500).json({ 
         success: false, 
         message: error.message 
+      });
+    }
+  });
+
+  // Sync attendance and excuse data from Neon to Google Sheets
+  app.post("/api/sync/to-sheets", requireRole("admin"), async (_req: Request, res: Response) => {
+    try {
+      console.log("Starting sync from Neon to Google Sheets...");
+      
+      // Get all attendance data
+      const attendanceData = await storage.getAllAttendance();
+      console.log(`Found ${attendanceData.length} attendance records`);
+      
+      // Get all excuse data  
+      const excuseData = await storage.getAllExcuses();
+      console.log(`Found ${excuseData.length} excuse records`);
+      
+      // Clear existing data in Google Sheets
+      console.log("Clearing Google Sheets...");
+      const clearResult = await sheetClearAttendance();
+      console.log("Clear result:", clearResult);
+      
+      // Initialize headers
+      console.log("Initializing headers...");
+      await sheetInitHeaders();
+      
+      // Sync attendance data
+      let syncedAttendance = 0;
+      for (const attendance of attendanceData) {
+        try {
+          const user = await storage.getUser(attendance.userId);
+          if (user) {
+            await sheetAppendAttendance({
+              tanggal: attendance.date,
+              nama: user.name,
+              nisnNip: user.identifier,
+              kelas: user.className || '',
+              jamDatang: attendance.checkInTime || '',
+              jamPulang: attendance.checkOutTime || '',
+              status: attendance.status,
+              role: user.role
+            });
+            syncedAttendance++;
+          }
+        } catch (error) {
+          console.error("Error syncing attendance:", error);
+        }
+      }
+      
+      // Sync excuse data (add to same sheet with different status)
+      let syncedExcuses = 0;
+      for (const excuse of excuseData) {
+        try {
+          const user = await storage.getUser(excuse.userId);
+          if (user) {
+            await sheetAppendAttendance({
+              tanggal: excuse.date,
+              nama: user.name,
+              nisnNip: user.identifier,
+              kelas: user.className || '',
+              jamDatang: '',
+              jamPulang: '',
+              status: `IZIN: ${excuse.reason}`,
+              role: user.role
+            });
+            syncedExcuses++;
+          }
+        } catch (error) {
+          console.error("Error syncing excuse:", error);
+        }
+      }
+      
+      const result = {
+        success: true,
+        message: "Sync completed successfully",
+        data: {
+          attendanceRecords: attendanceData.length,
+          excuseRecords: excuseData.length,
+          syncedAttendance,
+          syncedExcuses,
+          totalSynced: syncedAttendance + syncedExcuses
+        }
+      };
+      
+      console.log("Sync result:", result);
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("Sync error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message
       });
     }
   });
