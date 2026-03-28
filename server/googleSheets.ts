@@ -253,3 +253,107 @@ export async function getSheetTabs(): Promise<string[]> {
     return ['Sheet1'];
   }
 }
+
+// Additional functions for compatibility
+export async function sheetInitHeaders() {
+  try {
+    const googleSheetsUrl = await getGoogleSheetsUrl();
+    
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'init_headers'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('Google Sheets headers initialized:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Failed to init sheet headers:', error);
+    return null;
+  }
+}
+
+// Apps Script code constant
+export const APPS_SCRIPT_CODE = `// Paste script ini di Google Sheets: Extensions → Apps Script → Code.gs
+// Lalu klik Deploy → New deployment → Web App → Anyone can access → Deploy
+// Salin URL deployment dan paste di pengaturan aplikasi
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+
+    if (data.action === "ping") {
+      return ok("pong");
+    }
+
+    if (data.action === "init_headers") {
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(["Tanggal","Nama","NISN/NIP","Kelas","Jam Datang","Jam Pulang","Status","Role"]);
+      }
+      return ok("headers initialized");
+    }
+
+    if (data.action === "append") {
+      sheet.appendRow([
+        data.tanggal, data.nama, data.nisnNip, data.kelas,
+        data.jamDatang, data.jamPulang, data.status, data.role
+      ]);
+      return ok("appended");
+    }
+
+    if (data.action === "update") {
+      const values = sheet.getDataRange().getValues();
+      const tz = Session.getScriptTimeZone();
+      for (let i = values.length - 1; i >= 1; i--) {
+        const cellDate = values[i][0];
+        const rowDate = cellDate instanceof Date
+          ? Utilities.formatDate(cellDate, tz, "yyyy-MM-dd")
+          : String(cellDate).trim();
+        const rowId = String(values[i][2]).trim().replace(/\.0+$/, "");
+        const targetId = String(data.nisnNip).trim().replace(/\.0+$/, "");
+        if (rowDate === String(data.tanggal).trim() && rowId === targetId) {
+          sheet.getRange(i + 1, 6).setValue(data.jamPulang);
+          if (data.status) sheet.getRange(i + 1, 7).setValue(data.status);
+          return ok("updated row " + (i + 1));
+        }
+      }
+      // Fallback: row not found, append a new row so checkout is never lost
+      sheet.appendRow([
+        data.tanggal, data.nama || "-", data.nisnNip, data.kelas || "-",
+        data.jamDatang || "-", data.jamPulang, data.status || "-", data.role || "-"
+      ]);
+      return ok("row not found, appended new");
+    }
+
+    if (data.action === "clear") {
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      return ok("cleared");
+    }
+
+    return ok("unknown action");
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function ok(msg) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ success: true, message: msg }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;

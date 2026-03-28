@@ -6,8 +6,7 @@ import multer from "multer";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { loginSchema, insertUserSchema, insertHolidaySchema } from "@shared/schema";
-import { readUsersFromSheet, getSheetTabs } from "./googleSheets";
-import { sheetAppendAttendance, sheetUpdateAttendance, sheetInitHeaders, sheetClearAttendance, testWebhook, APPS_SCRIPT_CODE } from "./appsScript";
+import { readUsersFromSheet, getSheetTabs, sheetAppendAttendance, sheetUpdateAttendance, sheetClearAttendance, sheetInitHeaders, testWebhook } from "./googleSheets";
 import { uploadExcusePhoto, getAuthUrl, auth } from "./googleDrive";
 import { sendCheckInNotification, sendLateNotification, sendCheckOutNotification, sendManualAttendanceNotification, sendExcuseNotificationToHomeroom, sendAlphaNotification, sendTestNotification } from "./fonnte";
 import crypto from "crypto";
@@ -178,6 +177,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  console.log("Registering routes...");
   wss = new WebSocketServer({ server: httpServer, path: "/ws" });
   wss.on("connection", (ws) => {
     ws.send(JSON.stringify({ type: "connected" }));
@@ -665,7 +665,16 @@ export async function registerRoutes(
           sendCheckOutNotification(user.parentPhone, user.name, currentTime).catch(console.error);
         }
 
-        sheetUpdateAttendance(currentDate, user.identifier, currentTime, existing.status || "hadir", { nama: user.name, kelas: user.className || '-', role: user.role }).catch(console.error);
+        sheetUpdateAttendance({
+          tanggal: currentDate,
+          nama: user.name,
+          nisnNip: user.identifier,
+          kelas: user.className || '',
+          jamDatang: '',
+          jamPulang: currentTime,
+          status: existing.status || "hadir",
+          role: user.role
+        }).catch(console.error);
 
         broadcastUpdate("attendance", { action: "checkout", userName: user.name });
 
@@ -724,7 +733,16 @@ export async function registerRoutes(
           return res.status(409).json({ message: `${targetUser.name} sudah absen pulang pada ${date}` });
         }
         await storage.updateAttendance(existing.id, { checkOutTime: currentTime });
-        sheetUpdateAttendance(date, targetUser.identifier, currentTime, existing.status || "hadir", { nama: targetUser.name, kelas: targetUser.className || '-', role: targetUser.role }).catch(console.error);
+        sheetUpdateAttendance({
+          tanggal: date,
+          nama: targetUser.name,
+          nisnNip: targetUser.identifier,
+          kelas: targetUser.className || '',
+          jamDatang: '',
+          jamPulang: currentTime,
+          status: existing.status || "hadir",
+          role: targetUser.role
+        }).catch(console.error);
         responseMessage = `${targetUser.name} - Absen Pulang Manual (${currentTime})`;
       } else if (type === "izin" || type === "sakit" || type === "alpha") {
         if (existing) {
