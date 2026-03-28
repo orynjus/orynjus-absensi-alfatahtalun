@@ -3,16 +3,19 @@ import { db } from './db';
 import { scannerSettings } from '@shared/schema';
 
 async function getGoogleSheetsUrl(): Promise<string> {
-  // Force use working Apps Script Web App URL
-  return 'https://script.google.com/macros/s/AKfycbxvf2IXArzFnDNG0L1aIjzI_HqtdOlKtrDfs0NAL-cmd81BDBGutbR_Usp3EBheKvLd/exec';
+  // Use the working Apps Script Web App URL that user tested
+  return 'https://script.google.com/macros/s/AKfycbzqc7E5IejG5-I4XTRf1Aq3pn79-J_4gEAkNFlGnnBJSKBdcVZzoN6ImufmnFFUlaIx/exec';
   
-  // Old code with database issue - commented out
+  // Old URLs for reference - commented out
   /*
+  // Previous working URL:
+  // return 'https://script.google.com/macros/s/AKfycbxvf2IXArzFnDNG0L1aIjzI_HqtdOlKtrDfs0NAL-cmd81BDBGutbR_Usp3EBheKvLd/exec';
+  
+  // Database fallback (caused issues):
   try {
     const [settings] = await db.select({ googleSheetId: scannerSettings.googleSheetId }).from(scannerSettings).limit(1);
     if (settings?.googleSheetId) return settings.googleSheetId;
   } catch {}
-  return 'https://script.google.com/macros/s/AKfycbxvf2IXArzFnDNG0L1aIjzI_HqtdOlKtrDfs0NAL-cmd81BDBGutbR_Usp3EBheKvLd/exec';
   */
 }
 
