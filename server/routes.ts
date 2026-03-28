@@ -1394,6 +1394,79 @@ export async function registerRoutes(
     }
   });
 
+  // Test scan without schedule restriction
+  app.post("/api/test/scan", async (req: Request, res: Response) => {
+    try {
+      const { qrCode } = req.body;
+      
+      // Find user by QR code (bypass schedule)
+      const user = await storage.getUserByQrCode(qrCode);
+      
+      if (!user) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "QR code tidak terdaftar" 
+        });
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const currentTime = new Date().toTimeString().slice(0, 5);
+      
+      // Check existing attendance
+      const existing = await storage.getAttendanceByUserAndDate(user.id, today);
+      
+      if (existing && existing.checkOutTime) {
+        return res.json({
+          success: false,
+          message: "Sudah check-out hari ini",
+          attendance: existing
+        });
+      }
+
+      // Create or update attendance
+      const attendance = existing ? 
+        await storage.updateAttendance(existing.id, { checkOutTime: currentTime }) :
+        await storage.createAttendance({
+          userId: user.id,
+          date: today,
+          checkInTime: currentTime,
+          checkOutTime: null,
+          status: "hadir",
+          method: "qr"
+        });
+
+      // Update Google Sheets
+      if (attendance) {
+        await sheetUpdateAttendance({
+          tanggal: today,
+          nama: user.name,
+          nisnNip: user.identifier,
+          kelas: user.className || '',
+          jamDatang: existing ? '' : currentTime,
+          jamPulang: existing ? currentTime : '',
+          status: "hadir",
+          role: user.role
+        });
+      }
+
+      // Broadcast update
+      broadcastUpdate("attendance", { userId: user.id, action: existing ? "checkout" : "checkin" });
+
+      res.json({
+        success: true,
+        message: existing ? "Check-out berhasil" : "Check-in berhasil",
+        attendance
+      });
+
+    } catch (error: any) {
+      console.error("Test scan error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+  });
+
   // Health check endpoint for Koyeb
   app.get("/api/health", (_req: Request, res: Response) => {
     const uptime = process.uptime();
